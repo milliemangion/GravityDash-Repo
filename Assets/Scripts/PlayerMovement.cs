@@ -3,7 +3,11 @@ using System.Collections;
 
 public class PlayerMovement : MonoBehaviour
 {
+    [Header("Particles")]
     public ParticleSystem trailParticles;
+    public GameObject tokenBurstPrefab;
+
+    [Header("Movement")]
     public float gravityScale = 3f;
 
     private Rigidbody2D rb;
@@ -20,9 +24,15 @@ public class PlayerMovement : MonoBehaviour
         // Keep player fixed horizontally
         rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
 
+        // Gravity flip
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            trailParticles.Emit(Random.Range(10, 20));
+            // Emit flip particles
+            if (trailParticles != null)
+            {
+                trailParticles.Emit(Random.Range(10, 20));
+            }
+
             FlipGravity();
         }
     }
@@ -45,7 +55,7 @@ public class PlayerMovement : MonoBehaviour
         float startRotation = transform.eulerAngles.z;
         float targetRotation = isUpsideDown ? 180f : 0f;
 
-        // Prevent weird spin
+        // Prevent weird long spins
         if (Mathf.Abs(startRotation - targetRotation) > 180f)
         {
             if (startRotation > targetRotation)
@@ -57,10 +67,13 @@ public class PlayerMovement : MonoBehaviour
         while (elapsed < duration)
         {
             float t = elapsed / duration;
+
             float z = Mathf.Lerp(startRotation, targetRotation, t);
+
             transform.rotation = Quaternion.Euler(0, 0, z);
 
             elapsed += Time.deltaTime;
+
             yield return null;
         }
 
@@ -69,16 +82,27 @@ public class PlayerMovement : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D other)
     {
-        // 💀 Game Over
+        // Game Over
         if (other.CompareTag("Obstacle"))
         {
             GameManager.instance.GameOver();
         }
 
-        // ⭐ Collect Token
+        // Collect Token
         if (other.CompareTag("Token"))
         {
+            // Spawn burst effect
+            if (tokenBurstPrefab != null)
+            {
+                Instantiate(
+                    tokenBurstPrefab,
+                    other.transform.position,
+                    Quaternion.identity
+                );
+            }
+
             Destroy(other.gameObject);
+
             GameManager.instance.AddScore(1);
         }
     }
