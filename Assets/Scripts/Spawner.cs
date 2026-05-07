@@ -3,15 +3,24 @@ using System.Collections;
 
 public class Spawner : MonoBehaviour
 {
+    [Header("Scene References")]
+    public Transform ground;
+    public Transform ceiling;
+
+    [Header("Prefabs")]
     public GameObject obstaclePrefab;
     public GameObject tokenPrefab;
+
     public static bool stopSpawning = false;
 
+    [Header("Difficulty")]
     public float spawnRate = 1.5f;
     public float minSpawnRate = 0.8f;
 
+    [Header("Colours")]
     public Color groundColor;
     public Color ceilingColor;
+    public Color middleColor = Color.white;
 
     private float _timer;
     private float _speedTimer;
@@ -21,8 +30,9 @@ public class Spawner : MonoBehaviour
 
     void Update()
     {
-        // ✅ STOP spawning when game over
-        if (stopSpawning) return;
+        // Stop everything after death
+        if (stopSpawning)
+            return;
 
         _timer += Time.deltaTime;
 
@@ -32,7 +42,7 @@ public class Spawner : MonoBehaviour
             _timer = 0f;
         }
 
-        // Difficulty timer
+        // Difficulty scaling
         _speedTimer += Time.deltaTime;
 
         if (_speedTimer >= 25f)
@@ -41,22 +51,14 @@ public class Spawner : MonoBehaviour
             {
                 ObstacleMover.globalSpeed += 0.05f;
             }
-            else
-            {
-                ObstacleMover.globalSpeed -= 0.1f;
-            }
 
             _speedTimer = 0f;
         }
 
-        // Spawn rate control
+        // Spawn rate scaling
         if (spawnRate > minSpawnRate)
         {
             spawnRate -= Time.deltaTime * 0.02f;
-        }
-        else
-        {
-            spawnRate += Time.deltaTime * 0.01f;
         }
     }
 
@@ -64,25 +66,37 @@ public class Spawner : MonoBehaviour
     {
         _canSpawn = false;
 
-        int pattern = Random.Range(0, 2);
+        int pattern = Random.Range(0, 3);
 
+        // Single obstacle
         if (pattern == 0)
         {
             float lane = GetSafeLane();
+
             SpawnObstacle(lane);
             SpawnTokenSafe(lane);
         }
-        else
+
+        // Double obstacle
+        else if (pattern == 1)
         {
             float firstLane = GetSafeLane();
+
             SpawnObstacle(firstLane);
 
             yield return new WaitForSeconds(0.5f);
 
-            float secondLane = OppositeLane(firstLane);
-            SpawnObstacle(secondLane);
+            float secondLane = DifferentLane(firstLane);
 
+            SpawnObstacle(secondLane);
             SpawnTokenSafe(secondLane);
+        }
+
+        // Middle obstacle pattern
+        else
+        {
+            SpawnObstacle(MiddleLane());
+            SpawnTokenSafe(MiddleLane());
         }
 
         yield return new WaitForSeconds(0.4f);
@@ -95,22 +109,57 @@ public class Spawner : MonoBehaviour
         float lane;
 
         if (Random.value > 0.6f)
-            lane = OppositeLane(_lastLane);
+        {
+            lane = DifferentLane(_lastLane);
+        }
         else
+        {
             lane = RandomLane();
+        }
 
         _lastLane = lane;
+
         return lane;
     }
 
     float RandomLane()
     {
-        return Random.value > 0.5f ? 2f : -2f;
+        int lane = Random.Range(0, 3);
+
+        if (lane == 0)
+            return GroundLane();
+
+        if (lane == 1)
+            return MiddleLane();
+
+        return CeilingLane();
     }
 
-    float OppositeLane(float lane)
+    float DifferentLane(float currentLane)
     {
-        return lane == 2f ? -2f : 2f;
+        float newLane = RandomLane();
+
+        while (Mathf.Abs(newLane - currentLane) < 0.1f)
+        {
+            newLane = RandomLane();
+        }
+
+        return newLane;
+    }
+
+    float GroundLane()
+    {
+        return ground.position.y + 1f;
+    }
+
+    float CeilingLane()
+    {
+        return ceiling.position.y - 1f;
+    }
+
+    float MiddleLane()
+    {
+        return 0f;
     }
 
     void SpawnObstacle(float y)
@@ -128,7 +177,19 @@ public class Spawner : MonoBehaviour
 
         if (sr != null)
         {
-            sr.color = (y < 0) ? groundColor : ceilingColor;
+            if (Mathf.Abs(y - GroundLane()) < 0.1f)
+            {
+                sr.color = groundColor;
+            }
+            else if (Mathf.Abs(y - CeilingLane()) < 0.1f)
+            {
+                sr.color = ceilingColor;
+            }
+            else
+            {
+                // Randomly use ground or ceiling colour
+                sr.color = Random.value > 0.5f ? groundColor : ceilingColor;
+            }
         }
     }
 
@@ -136,12 +197,26 @@ public class Spawner : MonoBehaviour
     {
         float y;
 
-        int choice = Random.Range(0, 2);
+        int choice = Random.Range(0, 3);
 
         if (choice == 0)
-            y = 0f;
+        {
+            y = MiddleLane();
+        }
+        else if (choice == 1)
+        {
+            y = GroundLane();
+        }
         else
-            y = (obstacleLane == 2f) ? -1.5f : 1.5f;
+        {
+            y = CeilingLane();
+        }
+
+        // Prevent token spawning directly inside obstacle
+        if (Mathf.Abs(y - obstacleLane) < 0.1f)
+        {
+            y = MiddleLane();
+        }
 
         float xOffset = Random.Range(12f, 14f);
 

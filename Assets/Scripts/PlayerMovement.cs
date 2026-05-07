@@ -3,6 +3,7 @@ using System.Collections;
 
 public class PlayerMovement : MonoBehaviour
 {
+    public ParticleSystem trailParticles;
     public float gravityScale = 3f;
 
     private Rigidbody2D rb;
@@ -21,6 +22,7 @@ public class PlayerMovement : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Space))
         {
+            trailParticles.Emit(Random.Range(10, 20));
             FlipGravity();
         }
     }
